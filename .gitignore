@@ -1,0 +1,14 @@
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
+
+/letsencrypt/conf/*
+!/letsencrypt/conf/.gitkeep
+/letsencrypt/www/*
+!/letsencrypt/www/.gitkeep
+/letsencrypt/logs/*
+!/letsencrypt/logs/.gitkeep
+/static/*
+!/static/.gitkeep

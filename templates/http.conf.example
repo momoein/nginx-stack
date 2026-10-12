@@ -1,0 +1,13 @@
+# First step: replace all example hostnames, copy into nginx/conf.d, and reload.
+server {
+    listen 80;
+    listen [::]:80;
+    server_name example.com www.example.com;
+
+    include /etc/nginx/snippets/acme.conf;
+
+    # Keep HTTP-only until the first certificate has been issued.
+    location / {
+        return 404;
+    }
+}

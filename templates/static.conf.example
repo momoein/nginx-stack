@@ -1,0 +1,35 @@
+# Follow the same HTTP-only bootstrap and issuance steps as a proxied site.
+# Put files under static/example.com; change every hostname and certificate path.
+server {
+    listen 80;
+    listen [::]:80;
+    server_name example.com www.example.com;
+
+    include /etc/nginx/snippets/acme.conf;
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name example.com www.example.com;
+
+    ssl_certificate /etc/letsencrypt/live/example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/example.com/privkey.pem;
+
+    root /srv/sites/example.com;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    # Do not publish hidden files such as .env or .git from deployed content.
+    location ~ /\. {
+        deny all;
+    }
+}
