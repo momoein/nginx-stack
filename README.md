@@ -30,8 +30,8 @@ Docker versions before 28 have a known issue where localhost-published ports can
 be reachable from other machines on the same L2 network. Use a current patched
 Engine and verify application ports from another machine. See [port publishing](https://docs.docker.com/engine/network/port-publishing/).
 
-This setup uses HTTP-01: port 80 must remain public for renewal. Wildcards need
-a separate DNS-01 workflow. Multi-server routing, automatic domain discovery,
+The default workflow uses HTTP-01: port 80 must remain public for renewal.
+Manual DNS-01 issuance, including wildcards, is documented below. Multi-server routing, automatic domain discovery,
 and zero-downtime application releases are outside this setup.
 
 ## Install the infrastructure
@@ -150,6 +150,45 @@ Certbot saves its renewal settings under `letsencrypt/conf`. No manual issuance
 command is needed again for ordinary renewal. Avoid running multiple issuance
 or renewal commands simultaneously; Certbot locks its shared storage.
 
+#### Alternative: manual DNS TXT challenge
+
+Use this instead of the webroot command above when you want to verify ownership
+through DNS, including for a wildcard certificate. No DNS plugin is needed.
+DNS-01 validation does not require public port 80 or the HTTP challenge setup in
+step 2; DNS records pointing to the server are still needed to serve the website.
+
+Run interactively from the stack directory, replacing the email and domains:
+
+```bash
+docker compose run --rm --no-deps certbot certonly \
+  --manual --preferred-challenges dns \
+  --cert-name example.com \
+  --email admin@example.com \
+  --agree-tos \
+  -d example.com \
+  -d '*.example.com'
+```
+
+Certbot prompts you to create TXT records at `_acme-challenge.example.com` in
+your DNS provider's dashboard. Use the exact values shown and wait for each
+record to be publicly visible before continuing. If multiple values are needed
+at the same name, keep them together until validation finishes. Remove the
+challenge TXT records after successful issuance. Quote the wildcard as shown;
+`*.example.com` covers immediate subdomains, while the separate `example.com`
+entry covers the root domain. For individual names, replace the wildcard with
+the names you need, such as `www.example.com`.
+
+After issuance, continue with step 4 using the same certificate paths. Set
+Nginx's `server_name` to the hostnames you intend to serve.
+
+**Renewal is manual for these certificates.** Before expiry, rerun the same
+command interactively, complete the new TXT challenges, then run
+`./scripts/reload.sh` to load the renewed certificate. The cron job and
+`renew.sh` cannot renew a manual DNS certificate without automation hooks;
+their renewal checks will report a failure when it is due. Keep expiry alerts
+enabled with `scripts/check-certificates.sh` and external HTTPS monitoring.
+See [Certbot's manual plugin documentation](https://eff-certbot.readthedocs.io/en/stable/using.html#manual).
+
 ### 4. Enable HTTPS
 
 After successful issuance:
@@ -200,6 +239,11 @@ Nginx mounts the directory read-only. The template uses normal file/directory
 routing. For an SPA, explicitly change its fallback to `/index.html`.
 
 ## Automatic renewal and alerts
+
+The renewal commands and cron job below apply to the HTTP-01 workflow. For
+manual DNS certificates, follow the manual renewal instructions above. If you
+manage both types, cron still renews eligible HTTP-01 certificates, but reports
+failures for manual DNS certificates that are due for renewal.
 
 First test renewal and reload separately:
 
